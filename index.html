@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ویدیو گرام</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;200;300;400;500;600;700;800;900&display=swap');
+        
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #fafafa;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+        }
+        
+        .video-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .active-tab {
+            color: #000;
+            border-top: 2px solid #000;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        
+        .modal-content {
+            background-color: #fff;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 400px;
+        }
+        
+        .close-btn {
+            color: #aaa;
+            float: left;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close-btn:hover {
+            color: #000;
+        }
+        
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .show-toast {
+            visibility: visible;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+        
+        @keyframes fadein {
+            from {bottom: 0; opacity: 0;}
+            to {bottom: 30px; opacity: 1;}
+        }
+        
+        @keyframes fadeout {
+            from {bottom: 30px; opacity: 1;}
+            to {bottom: 0; opacity: 0;}
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm py-3 px-4 fixed top-0 w-full z-10">
+        <div class="flex justify-between items-center">
+            <h1 class="text-xl font-bold">ویدیو گرام</h1>
+            <button id="addVideoBtn" class="text-blue-500">
+                <i class="fas fa-plus text-xl"></i>
+            </button>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto mt-14 mb-16">
+        <!-- Home Tab -->
+        <div id="homeTab" class="tab-content">
+            <div class="grid grid-cols-1 gap-4 p-4">
+                <!-- Videos will be loaded here -->
+            </div>
+        </div>
+        
+        <!-- Liked Videos Tab -->
+        <div id="likedTab" class="tab-content hidden">
+            <div class="grid grid-cols-1 gap-4 p-4">
+                <!-- Liked videos will be loaded here -->
+            </div>
+        </div>
+        
+        <!-- Saved Videos Tab -->
+        <div id="savedTab" class="tab-content hidden">
+            <div class="grid grid-cols-1 gap-4 p-4">
+                <!-- Saved videos will be loaded here -->
+            </div>
+        </div>
+        
+        <!-- My Videos Tab -->
+        <div id="myVideosTab" class="tab-content hidden">
+            <div class="grid grid-cols-1 gap-4 p-4">
+                <!-- User's videos will be loaded here -->
+            </div>
+        </div>
+    </main>
+    
+    <!-- Bottom Navigation -->
+    <nav class="bg-white border-t fixed bottom-0 w-full flex justify-around py-3">
+        <button class="tab-btn active-tab" data-tab="home">
+            <i class="fas fa-home text-xl"></i>
+        </button>
+        <button class="tab-btn" data-tab="liked">
+            <i class="fas fa-heart text-xl"></i>
+        </button>
+        <button class="tab-btn" data-tab="saved">
+            <i class="fas fa-bookmark text-xl"></i>
+        </button>
+        <button class="tab-btn" data-tab="myVideos">
+            <i class="fas fa-user text-xl"></i>
+        </button>
+    </nav>
+    
+    <!-- Add Video Modal -->
+    <div id="addVideoModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 class="text-lg font-bold mb-4">آپلود ویدیو جدید</h2>
+            <input type="file" id="fileInput" accept="video/*">
+            <button id="selectVideoBtn" class="w-full bg-blue-500 text-white py-2 rounded-lg mb-4">
+                انتخاب ویدیو از گالری
+            </button>
+            <div id="videoPreviewContainer" class="hidden">
+                <div class="video-container mb-4">
+                    <video id="videoPreview" controls></video>
+                </div>
+                <button id="uploadVideoBtn" class="w-full bg-green-500 text-white py-2 rounded-lg">
+                    آپلود ویدیو
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">پیام</div>
+    
+    <script>
+        // DOM Elements
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const addVideoBtn = document.getElementById('addVideoBtn');
+        const addVideoModal = document.getElementById('addVideoModal');
+        const closeBtn = document.querySelector('.close-btn');
+        const selectVideoBtn = document.getElementById('selectVideoBtn');
+        const fileInput = document.getElementById('fileInput');
+        const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+        const videoPreview = document.getElementById('videoPreview');
+        const uploadVideoBtn = document.getElementById('uploadVideoBtn');
+        const toast = document.getElementById('toast');
+        
+        // App State
+        let videos = JSON.parse(localStorage.getItem('videos')) || [];
+        let likedVideos = JSON.parse(localStorage.getItem('likedVideos')) || [];
+        let savedVideos = JSON.parse(localStorage.getItem('savedVideos')) || [];
+        
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            renderAllVideos();
+            renderLikedVideos();
+            renderSavedVideos();
+            renderMyVideos();
+            
+            // Check if there are no videos, show welcome message
+            if (videos.length === 0) {
+                showToast('به ویدیو گرام خوش آمدید! اولین ویدیوی خود را آپلود کنید.');
+            }
+        });
+        
+        // Tab Navigation
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabId = button.getAttribute('data-tab');
+                
+                // Update active tab button
+                tabButtons.forEach(btn => btn.classList.remove('active-tab'));
+                button.classList.add('active-tab');
+                
+                // Show the selected tab content
+                tabContents.forEach(content => content.classList.add('hidden'));
+                document.getElementById(`${tabId}Tab`).classList.remove('hidden');
+            });
+        });
+        
+        // Add Video Modal
+        addVideoBtn.addEventListener('click', () => {
+            addVideoModal.style.display = 'block';
+        });
+        
+        closeBtn.addEventListener('click', () => {
+            addVideoModal.style.display = 'none';
+            videoPreviewContainer.classList.add('hidden');
+        });
+        
+        window.addEventListener('click', (e) => {
+            if (e.target === addVideoModal) {
+                addVideoModal.style.display = 'none';
+                videoPreviewContainer.classList.add('hidden');
+            }
+        });
+        
+        // Select Video
+        selectVideoBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const videoURL = URL.createObjectURL(file);
+                videoPreview.src = videoURL;
+                videoPreviewContainer.classList.remove('hidden');
+            }
+        });
+        
+        // Upload Video
+        uploadVideoBtn.addEventListener('click', () => {
+            if (videoPreview.src) {
+                const newVideo = {
+                    id: Date.now(),
+                    url: videoPreview.src,
+                    likes: 0,
+                    isLiked: false,
+                    isSaved: false,
+                    timestamp: new Date().toLocaleString('fa-IR'),
+                    isMine: true
+                };
+                
+                videos.unshift(newVideo);
+                saveToLocalStorage();
+                
+                renderAllVideos();
+                renderMyVideos();
+                
+                addVideoModal.style.display = 'none';
+                videoPreviewContainer.classList.add('hidden');
+                videoPreview.src = '';
+                fileInput.value = '';
+                
+                showToast('ویدیو با موفقیت آپلود شد!');
+            }
+        });
+        
+        // Render Videos
+        function renderAllVideos() {
+            const homeTab = document.querySelector('#homeTab > div');
+            homeTab.innerHTML = '';
+            
+            if (videos.length === 0) {
+                homeTab.innerHTML = `
+                    <div class="text-center py-10">
+                        <i class="fas fa-video-slash text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500">هنوز ویدیویی وجود ندارد</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            videos.forEach(video => {
+                const videoElement = createVideoElement(video);
+                homeTab.appendChild(videoElement);
+            });
+        }
+        
+        function renderLikedVideos() {
+            const likedTab = document.querySelector('#likedTab > div');
+            likedTab.innerHTML = '';
+            
+            const filteredVideos = videos.filter(video => likedVideos.includes(video.id));
+            
+            if (filteredVideos.length === 0) {
+                likedTab.innerHTML = `
+                    <div class="text-center py-10">
+                        <i class="far fa-heart text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500">ویدیویی مورد علاقه وجود ندارد</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            filteredVideos.forEach(video => {
+                const videoElement = createVideoElement(video);
+                likedTab.appendChild(videoElement);
+            });
+        }
+        
+        function renderSavedVideos() {
+            const savedTab = document.querySelector('#savedTab > div');
+            savedTab.innerHTML = '';
+            
+            const filteredVideos = videos.filter(video => savedVideos.includes(video.id));
+            
+            if (filteredVideos.length === 0) {
+                savedTab.innerHTML = `
+                    <div class="text-center py-10">
+                        <i class="far fa-bookmark text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500">ویدیویی ذخیره شده وجود ندارد</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            filteredVideos.forEach(video => {
+                const videoElement = createVideoElement(video);
+                savedTab.appendChild(videoElement);
+            });
+        }
+        
+        function renderMyVideos() {
+            const myVideosTab = document.querySelector('#myVideosTab > div');
+            myVideosTab.innerHTML = '';
+            
+            const filteredVideos = videos.filter(video => video.isMine);
+            
+            if (filteredVideos.length === 0) {
+                myVideosTab.innerHTML = `
+                    <div class="text-center py-10">
+                        <i class="fas fa-user-slash text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500">هنوز ویدیویی آپلود نکرده‌اید</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            filteredVideos.forEach(video => {
+                const videoElement = createVideoElement(video);
+                myVideosTab.appendChild(videoElement);
+            });
+        }
+        
+        function createVideoElement(video) {
+            const videoElement = document.createElement('div');
+            videoElement.className = 'bg-white rounded-lg shadow overflow-hidden';
+            videoElement.dataset.id = video.id;
+            
+            videoElement.innerHTML = `
+                <div class="video-container">
+                    <video src="${video.url}" controls></video>
+                </div>
+                <div class="p-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs text-gray-500">${video.timestamp}</span>
+                        ${video.isMine ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">شما</span>' : ''}
+                    </div>
+                    <div class="flex justify-around">
+                        <button class="like-btn flex items-center ${video.isLiked ? 'text-red-500' : 'text-gray-500'}">
+                            <i class="fas fa-heart mr-1"></i>
+                            <span>${video.likes}</span>
+                        </button>
+                        <button class="save-btn ${video.isSaved ? 'text-yellow-500' : 'text-gray-500'}">
+                            <i class="fas fa-bookmark"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners
+            const likeBtn = videoElement.querySelector('.like-btn');
+            const saveBtn = videoElement.querySelector('.save-btn');
+            
+            likeBtn.addEventListener('click', () => toggleLike(video.id));
+            saveBtn.addEventListener('click', () => toggleSave(video.id));
+            
+            return videoElement;
+        }
+        
+        // Like/Unlike Video
+        function toggleLike(videoId) {
+            const videoIndex = videos.findIndex(v => v.id === videoId);
+            
+            if (videoIndex !== -1) {
+                if (videos[videoIndex].isLiked) {
+                    videos[videoIndex].likes--;
+                    videos[videoIndex].isLiked = false;
+                    likedVideos = likedVideos.filter(id => id !== videoId);
+                } else {
+                    videos[videoIndex].likes++;
+                    videos[videoIndex].isLiked = true;
+                    likedVideos.push(videoId);
+                }
+                
+                saveToLocalStorage();
+                
+                // Update all views
+                renderAllVideos();
+                renderLikedVideos();
+                renderSavedVideos();
+                renderMyVideos();
+            }
+        }
+        
+        // Save/Unsave Video
+        function toggleSave(videoId) {
+            const videoIndex = videos.findIndex(v => v.id === videoId);
+            
+            if (videoIndex !== -1) {
+                if (videos[videoIndex].isSaved) {
+                    videos[videoIndex].isSaved = false;
+                    savedVideos = savedVideos.filter(id => id !== videoId);
+                } else {
+                    videos[videoIndex].isSaved = true;
+                    savedVideos.push(videoId);
+                }
+                
+                saveToLocalStorage();
+                
+                // Update all views
+                renderAllVideos();
+                renderLikedVideos();
+                renderSavedVideos();
+                renderMyVideos();
+            }
+        }
+        
+        // Save to Local Storage
+        function saveToLocalStorage() {
+            localStorage.setItem('videos', JSON.stringify(videos));
+            localStorage.setItem('likedVideos', JSON.stringify(likedVideos));
+            localStorage.setItem('savedVideos', JSON.stringify(savedVideos));
+        }
+        
+        // Show Toast Notification
+        function showToast(message) {
+            toast.textContent = message;
+            toast.className = 'toast show-toast';
+            setTimeout(() => {
+                toast.className = toast.className.replace('show-toast', '');
+            }, 3000);
+        }
+        
+        // Service Worker for Offline Capability
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful');
+                }).catch(err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
